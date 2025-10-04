@@ -1,4 +1,4 @@
-export function setData(data, expiry, key, value, type = null, ttl = null) {
+function setData(data, expiry, key, value, type = null, ttl = null) {
   if (type) {
     const upperType = type.toUpperCase();
 
@@ -18,3 +18,5 @@ export function setData(data, expiry, key, value, type = null, ttl = null) {
 
   return "OK";
 }
+
+module.exports = { setData };

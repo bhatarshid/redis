@@ -1,4 +1,4 @@
-export function getData(data, expiry, key) {
+function getData(data, expiry, key) {
   if (expiry.get(key)) {
     if (new Date(expiry.get(key)) >= new Date()) {
       return data.get(key);
@@ -13,3 +13,5 @@ export function getData(data, expiry, key) {
     return data.get(key);
   }
 }
+
+module.exports = { getData };

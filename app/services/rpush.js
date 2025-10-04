@@ -1,4 +1,4 @@
-export function rpushData(data, key, value) {
+function rpushData(data, key, value) {
   if (data.has(key) && Array.isArray(data.get(key))) {
     const prevValues = data.get(key);
     prevValues.push(...value);
@@ -10,7 +10,7 @@ export function rpushData(data, key, value) {
   return data.get(key);
 }
 
-export function lrangeData(data, key, start, stop) {
+function lrangeData(data, key, start, stop) {
   if (!data.has(key)) {
     return null
   }
@@ -18,7 +18,9 @@ export function lrangeData(data, key, start, stop) {
   return values.slice(+start, +stop+1)
 }
 
-export function lpopData(data, key) {
+function lpopData(data, key, range) {
   if (!data.has(key) || !Array.isArray(data.get(key))) return null;
-  return data.get(key).shift();
+  return data.get(key).splice(0, range);
 }
+
+module.exports = { rpushData, lrangeData, lpopData };
