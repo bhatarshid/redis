@@ -1,17 +1,24 @@
-function getData(data, expiry, key) {
-  if (expiry.get(key)) {
-    if (new Date(expiry.get(key)) >= new Date()) {
-      return data.get(key);
+const store = require("../store");
+
+function getData(key) {
+  const data = store.get(key);
+  const expiry = data?.ttl;
+  if (expiry) {
+    if (new Date(expiry) >= new Date()) {
+      return data.value;
     }
     else {
-      data.delete(key);
-      expiry.delete(key);
+      store.delete(key);
       return null;
     }
   }
+  else if (data) {
+    return data.value;
+  }
   else {
-    return data.get(key);
+    return null;
   }
 }
+
 
 module.exports = { getData };

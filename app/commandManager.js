@@ -1,8 +1,10 @@
 const { setData } = require("./services/set");
 const { getData } = require("./services/get");
-const { rpushData, lrangeData, lpopData } = require("./services/rpush");
+const { rpushData, lrangeData, lpopData } = require("./services/list");
+const { addToStream } = require("./services/stream");
+const store = require("./store");
 
-const commandManager = (connection, dataList, expiry) => {
+const commandManager = (connection) => {
   connection.on("data", (data) => {
     const input = data.toString();
     const parts = input.split("\r\n");
@@ -23,7 +25,7 @@ const commandManager = (connection, dataList, expiry) => {
         const type = parts[8];
         const ttl = parts[10];
 
-        const status = setData(dataList, expiry, key, value, type, ttl);
+        const status = setData(key, value, type, ttl);
         if (status === 0) {
           connection.write(`-1\r\n`);
         } else {
@@ -33,7 +35,7 @@ const commandManager = (connection, dataList, expiry) => {
       }
       case "GET": {
         const key = parts[4];
-        const value = getData(dataList, expiry, key);
+        const value = getData(key);
         if (value) {
           connection.write(`$${value.length}\r\n${value}\r\n`);
         } else {
@@ -47,7 +49,7 @@ const commandManager = (connection, dataList, expiry) => {
         for (let i = 6; i<parts.length; i+=2) {
           valueList.push(parts[i]);
         }
-        const returnValue = rpushData(dataList, key, valueList);
+        const returnValue = rpushData(key, valueList);
         connection.write(`:${returnValue.length}\r\n`);
         break;
       }
@@ -59,7 +61,7 @@ const commandManager = (connection, dataList, expiry) => {
           connection.write("-ERR wrong number of arguments for command")
           break;
         }
-        const value = lrangeData(dataList, key, start, stop);
+        const value = lrangeData(key, start, stop);
 
         let response = `*${value.length}\r\n`
         value.forEach((v) => response += `$${v.length}\r\n${v}\r\n`)
@@ -76,7 +78,7 @@ const commandManager = (connection, dataList, expiry) => {
           connection.write("-ERR value is not an integer or out of range\r\n");
           break;
         }
-        const value = lpopData(dataList, key, range);
+        const value = lpopData(key, range);
         if (!value) {
           connection.write(`$-1\r\n`);
           break;
@@ -88,15 +90,27 @@ const commandManager = (connection, dataList, expiry) => {
       }
       case "TYPE": {
         const key = parts[4];
-        if (!dataList.has(key)) {
+        if (!store.has(key)) {
           connection.write(`+none\r\n`)
         }
-        const value = dataList.get(key);
-        if (Array.isArray(value)) {
-          connection.write(`+list\r\n`)
-        } else {
-          connection.write(`+string\r\n`)
+        const data = store.get(key);
+        if (data) {
+          connection.write(`+${data.type}\r\n`)
         }
+        else {
+          connection.write(`+none\r\n`)
+        }
+        break;
+      }
+      case "XADD": {
+        const streamKey = parts[4];
+        const id = parts[6];
+        const fieldList = [];
+        for (let i = 8; i < parts.length; i += 2) {
+          fieldList.push(parts[i]);
+        }
+        addToStream(streamKey, id, fieldList);
+        connection.write(`$${id.length}\r\n${id}\r\n`);
         break;
       }
       default:
