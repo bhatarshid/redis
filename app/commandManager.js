@@ -109,8 +109,12 @@ const commandManager = (connection) => {
         for (let i = 8; i < parts.length; i += 2) {
           fieldList.push(parts[i]);
         }
-        addToStream(streamKey, id, fieldList);
-        connection.write(`$${id.length}\r\n${id}\r\n`);
+        const response = addToStream(streamKey, id, fieldList);
+        if (response.status === false) {
+          connection.write(response.message);
+          break;
+        }
+        connection.write(`+${response.id}\r\n`);
         break;
       }
       default:
