@@ -1,8 +1,9 @@
 const { setData } = require("./services/set");
 const { getData } = require("./services/get");
 const { rpushData, lrangeData, lpopData } = require("./services/list");
-const { addToStream } = require("./services/stream");
+const { addToStream, getStreamData } = require("./services/stream");
 const store = require("./store");
+const { toRespArray } = require("../utils/util");
 
 const commandManager = (connection) => {
   connection.on("data", (data) => {
@@ -63,8 +64,7 @@ const commandManager = (connection) => {
         }
         const value = lrangeData(key, start, stop);
 
-        let response = `*${value.length}\r\n`
-        value.forEach((v) => response += `$${v.length}\r\n${v}\r\n`)
+        const response = toRespArray(value);
         connection.write(`${response}`);
         break;
       }
@@ -115,6 +115,14 @@ const commandManager = (connection) => {
           break;
         }
         connection.write(`+${response.id}\r\n`);
+        break;
+      }
+      case "XRANGE": {
+        const streamKey = parts[4];
+        const startId = parts[6];
+        const endId = parts[8];
+        const response = getStreamData(streamKey, startId, endId);
+        connection.write(`${response}`);
         break;
       }
       default:

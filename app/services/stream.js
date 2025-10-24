@@ -1,3 +1,4 @@
+const { toRespArray } = require("../../utils/util");
 const store = require("../store");
 
 function validateId(streamKey, timestamp, sequence) {
@@ -35,7 +36,7 @@ function validateId(streamKey, timestamp, sequence) {
 }
 
 function generateSequence(streamKey, timestamp) {
-  const data = store.get(streamKey);
+  const data = store.get(streamKey).value;
   if (!data || data.size === 0) {
     return timestamp === 0 ? 1 : 0;
   }
@@ -60,21 +61,21 @@ function addToStream(streamKey, id, fieldList) {
   }
   else {
     [timestamp, sequence] = id.split('-').map(Number);
-  }
-
-  const idValidation = validateId(streamKey, timestamp, sequence);
-  if (idValidation !== true) {
-    return {
-      status: false,
-      message: idValidation.message
+    const idValidation = validateId(streamKey, timestamp, sequence);
+    if (idValidation !== true) {
+      return {
+        status: false,
+        message: idValidation.message
+      }
     }
   }
 
+
   if (!store.has(streamKey)) {
-    store.set(streamKey, new Map());
+    store.set(streamKey, { value: new Map(), type: 'stream' });
   }
   const stream = store.get(streamKey);
-  stream.set(`${timestamp}-${sequence}`, fieldList);
+  stream.value.set(`${timestamp}-${sequence}`, fieldList);
 
   return {
     status: true,
@@ -83,4 +84,41 @@ function addToStream(streamKey, id, fieldList) {
   };
 }
 
-module.exports = { addToStream }
+function parseId(id, isStart) {
+  if (id === '-') return [Number.MIN_SAFE_INTEGER, 0];
+  if (id === '+') return [Number.MAX_SAFE_INTEGER, Number.MAX_SAFE_INTEGER];
+
+  const [tsStr, seqStr] = id.split('-');
+  const ts = Number(tsStr);
+  const seq = seqStr !== undefined ? Number(seqStr) : (isStart ? 0 : Number.MAX_SAFE_INTEGER);
+  return [ts, seq];
+}
+
+function getStreamData(streamKey, startId, endId) {
+  const stream = store.get(streamKey);
+  if (!stream || !stream.value || stream.value.size === 0) {
+    return toRespArray([]);
+  }
+
+  const [startTs, startSeq] = parseId(startId, true);
+  const [endTs, endSeq] = parseId(endId, false);
+
+  const entries = [];
+
+  for (const [id, fieldList] of stream.value.entries()) {
+    const [ts, seq] = id.split('-').map(Number);
+    const isAfterStart = ts > startTs || (ts === startTs && seq >= startSeq);
+    const isBeforeEnd = ts < endTs || (ts === endTs && seq <= endSeq);
+
+    if (isAfterStart && isBeforeEnd) {
+      entries.push([id, fieldList]);
+    }
+  }
+
+  return toRespArray(entries);
+}
+
+module.exports = { 
+  addToStream,
+  getStreamData
+}
